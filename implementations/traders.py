@@ -11,3 +11,12 @@ class SafeTrader(Trader):
     def trade(self, predictions: List[Prediction]):
         pass
         # TOGETHER
+
+
+def test():
+    pass
+
+
+if __name__ == '__main__':
+    # If this file is executed directly, the below examples will be run and tested:
+    test()

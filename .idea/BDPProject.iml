@@ -4,7 +4,7 @@
     <content url="file://C:/Program Files/spark-3.1.1-bin-hadoop2.7/python" />
     <content url="file://$MODULE_DIR$" />
     <content url="jar://C:/Program Files/spark-3.1.1-bin-hadoop2.7/python/lib/py4j-0.10.9-src.zip!/" />
-    <orderEntry type="inheritedJdk" />
+    <orderEntry type="jdk" jdkName="Python 3.7 (Discord Bot)" jdkType="Python SDK" />
     <orderEntry type="sourceFolder" forTests="false" />
   </component>
   <component name="TestRunnerService">

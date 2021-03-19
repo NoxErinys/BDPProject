@@ -1,19 +1,19 @@
+import yfinance as yf
+import pandas
+import findspark
 from functools import reduce
 from typing import List, Dict
 from datetime import datetime, timedelta
 from models import DataCollector, DataPoint
-import yfinance as yf
-import pandas
 from os import mkdir
 from pathlib import Path
-import findspark
 from pyspark.sql import SparkSession
 from pyspark.sql.functions import lit
 from pyspark.sql.types import StructType, StructField, StringType, DoubleType, TimestampType, IntegerType
 
 
 class YahooDataCollector(DataCollector):
-    def __init__(self, start_date: datetime, interval_in_seconds: int):
+    def __init__(self, interval_in_seconds: int):
         findspark.init()
         self.spark = SparkSession.builder.appName("BDPProject").getOrCreate()
         self.sc = self.spark.sparkContext
@@ -28,11 +28,9 @@ class YahooDataCollector(DataCollector):
             StructField('Symbol', StringType(), True),
         ])
 
-        self.number_of_days = (datetime.now() - start_date).days
+        super().__init__(interval_in_seconds)
 
-        super().__init__(start_date, interval_in_seconds)
-
-    def get_top_stocks(self, number_of_stocks=100) -> List[str]:
+    def get_top_stocks(self, current_time: datetime, number_of_stocks=100) -> List[str]:
 
         # Spark dataframe will be populated with all stocks data
         spark_data_frame = self.spark.createDataFrame([], self.schema)
@@ -40,10 +38,10 @@ class YahooDataCollector(DataCollector):
         lookup_table = pandas.read_csv("./datasets/nasdaq_lookup_table/nasdaq_lookup.csv", sep=";")
         stocks_list = lookup_table["Symbol"].tolist()
 
-        time_now = datetime.now()
-        for i in range(self.number_of_days):
-            start_time = (time_now - timedelta(days=i + 1)).strftime("%Y-%m-%d")
-            end_time = (time_now - timedelta(days=i)).strftime("%Y-%m-%d")
+        number_of_days_to_analyse = 30
+        for i in range(number_of_days_to_analyse):
+            start_time = (current_time - timedelta(days=i + 1)).strftime("%Y-%m-%d")
+            end_time = (current_time - timedelta(days=i)).strftime("%Y-%m-%d")
 
             historical_data_path = "./datasets/historical_data/"
             folder_path = historical_data_path + start_time + "/"
@@ -99,16 +97,13 @@ class YahooDataCollector(DataCollector):
             .limit(number_of_stocks) \
             .rdd.flatMap(lambda x: x).collect()
         return top_stocks_list
-        # SAMI
 
-    def get_historical_data(self, stock: str) -> List[DataPoint]:
+    def get_historical_data(self, stock: str, current_time: datetime, number_of_days: int=10) -> List[DataPoint]:
         spark_data_frame_for_stock = self.spark.createDataFrame([], self.schema)
 
-        time_now = datetime.now()
-
-        for i in range(self.number_of_days):
-            start_time = (time_now - timedelta(days=i + 1)).strftime("%Y-%m-%d")
-            end_time = (time_now - timedelta(days=i)).strftime("%Y-%m-%d")
+        for i in range(number_of_days):
+            start_time = (current_time - timedelta(days=i + 1)).strftime("%Y-%m-%d")
+            end_time = (current_time - timedelta(days=i)).strftime("%Y-%m-%d")
 
             historical_data_path = "./datasets/historical_data/"
             folder_path = historical_data_path + start_time + "/"
@@ -147,15 +142,13 @@ class YahooDataCollector(DataCollector):
                                for index, row in spark_data_frame_for_stock_sorted.iterrows()]
 
         return list_of_data_points
-        # SAMI
 
-    def get_latest_data_point(self, stocks: List[str]) -> Dict[str, DataPoint]:
+    def get_latest_data_point(self, stocks: List[str], current_time: datetime) -> Dict[str, DataPoint]:
 
         stocks_dict = {}
 
-        time_now = datetime.now()
-        start_time = time_now.strftime("%Y-%m-%d")
-        end_time = (time_now + timedelta(days=1)).strftime("%Y-%m-%d")
+        start_time = current_time.strftime("%Y-%m-%d")
+        end_time = (current_time + timedelta(days=1)).strftime("%Y-%m-%d")
 
         for stock in stocks:
             stock_data = yf.download(stock, start=start_time, end=end_time, interval="1m")
@@ -183,4 +176,11 @@ class YahooDataCollector(DataCollector):
             stocks_dict[stock] = data_point
 
         return stocks_dict
-        # SAMI
+
+
+def test():
+    pass
+
+
+if __name__ == '__main__':
+    test()

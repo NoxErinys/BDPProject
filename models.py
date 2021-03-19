@@ -106,8 +106,9 @@ class Trader(ABC):
     def get_net_worth(self, timestamp: datetime, stock_prices: Dict[str, float]):
         """
         INITIAL_BALANCE - BUYS UP UNTIL timestamp + UNRELEASED PROFIT UP UNTIL timestamp
+        TODO: FINISH UP
         """
-        pass
+        return self.balance
 
 
 class Visualizer(ABC):
