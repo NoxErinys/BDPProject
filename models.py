@@ -28,20 +28,19 @@ class Prediction:
 
 class DataCollector(ABC):
 
-    def __init__(self, start_date: datetime, interval_in_seconds: int):
-        self.start_date = start_date
+    def __init__(self, interval_in_seconds: int):
         self.interval_in_seconds = interval_in_seconds
 
     @abstractmethod
-    def get_top_stocks(self, number_of_stocks=100) -> List[str]:
+    def get_top_stocks(self, current_time: datetime,  number_of_stocks=10) -> List[str]:
         pass
 
     @abstractmethod
-    def get_historical_data(self, stock: str) -> List[DataPoint]:
+    def get_historical_data(self, stock: str, current_time: datetime, number_of_days: int=10) -> List[DataPoint]:
         pass
 
     @abstractmethod
-    def get_latest_data_point(self, stocks: List[str]) -> Dict[str, DataPoint]:
+    def get_latest_data_point(self, stocks: List[str], current_time: datetime) -> Dict[str, DataPoint]:
         pass
 
 
@@ -110,11 +109,17 @@ class Trader(ABC):
         """
         return self.balance
 
+    def save_trader(self, filename: str):
+        pass
+
+    def load_trader(self, filename: str):
+        pass
+
 
 class Visualizer(ABC):
 
     @abstractmethod
-    def plot_predictions(self, data: List[Prediction]):
+    def update_predictions_plot(self, data: List[Prediction]):
         pass
 
     @abstractmethod
