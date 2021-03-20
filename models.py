@@ -14,6 +14,9 @@ class DataPoint:
         self.volume = volume
         self.timestamp = timestamp
 
+    def __repr__(self):
+        return f"{self.close_price} at {str(self.timestamp)}"
+
 
 class Prediction:
 
@@ -46,8 +49,10 @@ class DataCollector(ABC):
 
 class Predictor(ABC):
 
-    def __init__(self, stock: str):
+    def __init__(self, stock: str, window: int, epochs: int):
+        self.window = window
         self.stock = stock
+        self.epochs = epochs
 
     @abstractmethod
     def train(self, data: List[DataPoint]):
