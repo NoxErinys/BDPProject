@@ -67,7 +67,7 @@ class MatPlotLibVisualizer(Visualizer):
 
         trading_data = {}
         for trader in traders:
-            net_worth = trader.get_net_worth(timestamp, current_prices)
+            net_worth = trader.get_current_net_worth(current_prices)
             trading_data[trader.name] = [timestamp, net_worth]
 
             color = next((c for c in self.color_mapping if self.color_mapping[c] == trader.name), None)

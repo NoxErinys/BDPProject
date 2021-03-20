@@ -67,8 +67,11 @@ def main(start_date):
         if not production_mode:
             current_date += timedelta(seconds=INTERVAL_IN_SECONDS)
         else:
-            execution_time = (datetime.now() - current_date).seconds
-            sleep(INTERVAL_IN_SECONDS - execution_time + 1)
+            execution_time = (datetime.now() - current_date).total_seconds()
+
+            if INTERVAL_IN_SECONDS - execution_time > 0:
+                sleep(INTERVAL_IN_SECONDS - execution_time + 1)
+
             current_date = datetime.now()
 
 

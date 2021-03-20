@@ -14,6 +14,9 @@ class DataPoint:
         self.volume = volume
         self.timestamp = timestamp
 
+    def __repr__(self):
+        return f"{self.close_price} at {str(self.timestamp)}"
+
 
 class Prediction:
 
@@ -36,7 +39,7 @@ class DataCollector(ABC):
         pass
 
     @abstractmethod
-    def get_historical_data(self, stock: str, current_time: datetime, number_of_days: int=10) -> List[DataPoint]:
+    def get_historical_data(self, stock: str, current_time: datetime, number_of_days: int = 10) -> List[DataPoint]:
         pass
 
     @abstractmethod
@@ -46,8 +49,10 @@ class DataCollector(ABC):
 
 class Predictor(ABC):
 
-    def __init__(self, stock: str):
+    def __init__(self, stock: str, window: int, epochs: int):
+        self.window = window
         self.stock = stock
+        self.epochs = epochs
 
     @abstractmethod
     def train(self, data: List[DataPoint]):
@@ -72,18 +77,40 @@ class StockPurchase:
 
 class StockBalanceSheet:
 
-    def __init__(self, name: str, purchases: List[StockPurchase]):
-        self.name = name
+    def __init__(self, stock_name: str, purchases: List[StockPurchase]):
+        self.stock_name = stock_name
         self.purchases = purchases
+        self._available_stocks = 0
 
-    def get_available_amount(self):
-        return sum([s.amount for s in self.purchases])
+    def get_current_available_amount(self):
+        return self._available_stocks
 
-    def get_unrealized_profit(self, current_price: float):
-        owned_value = sum([s.amount * s.price for s in self.purchases])
-        current_value = current_price * self.get_available_amount()
+    def get_current_unrealized_profit(self, current_price: float):
+        return self._available_stocks * current_price
 
-        return current_value - owned_value
+    def get_available_amount(self, timestamp: datetime):
+        return sum([p.amount for p in self.purchases if p.timestamp <= timestamp])
+
+    def get_unrealized_profit(self, price_at_timestamp: float, timestamp: datetime):
+        return self.get_available_amount(timestamp) * price_at_timestamp
+
+    def get_value(self, timestamp: datetime):
+        return sum([p.amount * p.price * -1 for p in self.purchases if p.timestamp <= timestamp])
+
+    def buy(self, amount: float, price: float, timestamp: datetime):
+        self._available_stocks += amount
+        self.purchases.append(StockPurchase(amount, price, timestamp))
+
+        return amount * price
+
+    def sell(self, amount: float, price: float, timestamp: datetime):
+        if amount > self._available_stocks:
+            raise Exception("Tried to sell more than owned")
+
+        self._available_stocks -= amount
+        self.purchases.append(StockPurchase(-amount, price, timestamp))
+
+        return amount * price
 
 
 class Trader(ABC):
@@ -98,22 +125,33 @@ class Trader(ABC):
     def trade(self, predictions: List[Prediction]):
         pass
 
+    def buy(self, stock: str, amount: float, price: float, timestamp: datetime):
+        if stock not in self.balance_sheet:
+            self.balance_sheet[stock] = StockBalanceSheet(stock, [])
+
+        self.balance -= self.balance_sheet[stock].buy(amount, price, timestamp)
+
+    def sell(self, stock: str, amount: float, price: float, timestamp: datetime):
+        if stock not in self.balance_sheet:
+            raise Exception("Can't sell srtock because it's not owned")
+
+        self.balance += self.balance_sheet[stock].sell(amount, price, timestamp)
+
+    def get_current_available_amount(self, stock: str):
+        if stock not in self.balance_sheet:
+            return 0
+
+        return self.balance_sheet[stock].get_current_available_amount()
+
     def get_current_net_worth(self, stock_prices: Dict[str, float]):
         return self.balance +\
-               sum([s.get_unrealized_profit(stock_prices[s.name]) for s in self.balance_sheet.values()])
+            sum([s.get_current_unrealized_profit(stock_prices[s.stock_name]) for s in self.balance_sheet.values()])
 
     def get_net_worth(self, timestamp: datetime, stock_prices: Dict[str, float]):
-        """
-        INITIAL_BALANCE - BUYS UP UNTIL timestamp + UNRELEASED PROFIT UP UNTIL timestamp
-        TODO: FINISH UP
-        """
-        return self.balance
+        balance = self.initial_balance + sum([s.get_value(timestamp) for s in self.balance_sheet.values()])
 
-    def save_trader(self, filename: str):
-        pass
-
-    def load_trader(self, filename: str):
-        pass
+        return balance + \
+            sum([s.get_unrealized_profit(stock_prices[s.stock_name], timestamp) for s in self.balance_sheet.values()])
 
 
 class Visualizer(ABC):

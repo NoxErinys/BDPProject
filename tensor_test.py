@@ -1,13 +1,9 @@
 import os
+import sys
 import datetime
-
-import IPython
-import IPython.display
-import matplotlib as mpl
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import seaborn as sns
 import tensorflow as tf
 
 MAX_EPOCHS = 5
@@ -42,6 +38,7 @@ class WindowGenerator:
         self.label_start = self.total_window_size - self.label_width
         self.labels_slice = slice(self.label_start, None)
         self.label_indices = np.arange(self.total_window_size)[self.labels_slice]
+        print("LABEL INDICES", self.label_indices)
 
     def __repr__(self):
         return '\n'.join([
@@ -92,6 +89,7 @@ class WindowGenerator:
         print("Input slice", self.input_slice)
         print("Labels slice", self.labels_slice)
         print("Window size", self.total_window_size)
+        print("Column indices", [self.column_indices[name] for name in self.label_columns])
 
         inputs = features[:, self.input_slice, :]
         labels = features[:, self.labels_slice, :]
@@ -105,9 +103,6 @@ class WindowGenerator:
         inputs.set_shape([None, self.input_width, None])
         labels.set_shape([None, self.label_width, None])
 
-        print("Inputs", inputs)
-        print("Labels", labels)
-
         return inputs, labels
 
     def plot(self, model=None, plot_col='T (degC)', max_subplots=3):
@@ -119,6 +114,12 @@ class WindowGenerator:
         for n in range(max_n):
             plt.subplot(max_n, 1, n + 1)
             plt.ylabel(f'{plot_col} [normed]')
+
+            print("PLOTTING")
+            print("N:", n)
+            print("INDEX:", plot_col_index)
+            print("INPUTS:", self.input_indices)
+
             plt.plot(self.input_indices, inputs[n, :, plot_col_index],
                      label='Inputs', marker='.', zorder=-10)
 
@@ -197,12 +198,13 @@ def get_train_validation_test_data(df):
     val_df = df[int(n * 0.7):int(n * 0.9)]
     test_df = df[int(n * 0.9):]
 
-    train_mean = train_df.mean()
-    train_std = train_df.std()
+    if False:
+        train_mean = train_df.mean()
+        train_std = train_df.std()
 
-    train_df = (train_df - train_mean) / train_std
-    val_df = (val_df - train_mean) / train_std
-    test_df = (test_df - train_mean) / train_std
+        train_df = (train_df - train_mean) / train_std
+        val_df = (val_df - train_mean) / train_std
+        test_df = (test_df - train_mean) / train_std
 
     return train_df, val_df, test_df
 
@@ -237,7 +239,7 @@ def test_model(model):
 
 
 def main():
-    lstm_model = tf.keras.models.Stequential([
+    lstm_model = tf.keras.models.Sequential([
         # Shape [batch, time, features] => [batch, time, lstm_units]
         tf.keras.layers.LSTM(32, return_sequences=True),
         # Shape => [batch, time, features]
