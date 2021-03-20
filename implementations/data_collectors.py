@@ -139,7 +139,11 @@ class YahooDataCollector(DataCollector):
                 stock_data_spark_df = self.spark.createDataFrame(stock_data, self.schema)
                 spark_data_frame_for_stock = spark_data_frame_for_stock.union(stock_data_spark_df)
 
-        spark_data_frame_for_stock_sorted = spark_data_frame_for_stock.sort("Datetime").collect()
+        spark_data_frame_for_stock_sorted = spark_data_frame_for_stock\
+            .where(spark_data_frame_for_stock.Datetime <= current_time.strftime("%Y-%m-%d %H:%M:%S"))\
+            .sort("Datetime")\
+            .collect()
+
         list_of_data_points = [DataPoint(row.Open,
                                          row.Close,
                                          row.High,
