@@ -165,7 +165,7 @@ class YahooDataCollector(DataCollector):
 
         for stock in stocks:
 
-            historical_data_path = "../datasets/historical_data/"
+            historical_data_path = "./datasets/historical_data/"
             folder_path = historical_data_path + start_time + "/"
             try:
                 Path(folder_path).mkdir(parents=True, exist_ok=True)
