@@ -43,14 +43,15 @@ class YahooDataCollector(DataCollector):
             start_time = (current_time - timedelta(days=i + 1)).strftime("%Y-%m-%d")
             end_time = (current_time - timedelta(days=i)).strftime("%Y-%m-%d")
 
-            historical_data_path = "./datasets/historical_data/"
+            historical_data_path = "../datasets/historical_data/"
             folder_path = historical_data_path + start_time + "/"
             try:
-                mkdir(folder_path)
+                Path(folder_path).mkdir(parents=True, exist_ok=True)
+
             except OSError:
                 print(f'Creation of the directory {folder_path} failed')
-            else:
-                print(f'Successfully created the directory {folder_path}')
+            # else:
+               # print(f'Successfully created the directory {folder_path}')
 
             for stock in stocks_list:
                 if "^" in stock or "/" in stock:
@@ -105,14 +106,14 @@ class YahooDataCollector(DataCollector):
             start_time = (current_time - timedelta(days=i)).strftime("%Y-%m-%d")
             end_time = (current_time - timedelta(days=i - 1)).strftime("%Y-%m-%d")
 
-            historical_data_path = "./datasets/historical_data/"
+            historical_data_path = "../datasets/historical_data/"
             folder_path = historical_data_path + start_time + "/"
             try:
-                mkdir(folder_path)
+                Path(folder_path).mkdir(parents=True, exist_ok=True)
             except OSError:
                 print(f'Creation of the directory {folder_path} failed')
-            else:
-                print(f'Successfully created the directory {folder_path}')
+            # else:
+                # print(f'Successfully created the directory {folder_path}')
 
             stock_file = Path(folder_path + stock + ".csv")
             if stock_file.is_file():
@@ -170,8 +171,9 @@ class YahooDataCollector(DataCollector):
             stock_data["Symbol"] = stock
             stock_data.set_index('Datetime')
 
-            last_point_row = self.spark.createDataFrame(stock_data, self.schema) \
-                .sort("Datetime", ascending=False).limit(1).select("*").first()
+            date_filter_string = "Datetime < '" + current_time.strftime("%Y-%m-%d %H:%M:%S") + "'"
+            data_frame = self.spark.createDataFrame(stock_data, self.schema)
+            last_point_row = data_frame.where(data_frame.Datetime <= current_time.strftime("%Y-%m-%d %H:%M:%S")).sort("Datetime", ascending=False).limit(1).select("*").first()
             data_point = DataPoint(last_point_row.Open,
                                    last_point_row.Close,
                                    last_point_row.High,
@@ -185,8 +187,12 @@ class YahooDataCollector(DataCollector):
 
 def test():
     yahoo_data_collector = YahooDataCollector(60)
+
     list_of_data_points = yahoo_data_collector.get_historical_data("AAPL", datetime(2021, 3, 17), 2)
     print([f'{data_point.timestamp}| volume: {data_point.volume}, close: {data_point.close_price}' for data_point in list_of_data_points])
+
+    # data_point = yahoo_data_collector.get_latest_data_point(["AAPL"], datetime(2021, 3, 12, 14, 30, 21))
+    # print(f'{data_point["AAPL"].timestamp}| volume: {data_point["AAPL"].volume}, close: {data_point["AAPL"].close_price}')
 
 
 if __name__ == '__main__':
