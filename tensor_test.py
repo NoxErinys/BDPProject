@@ -92,7 +92,6 @@ class WindowGenerator:
         print("Input slice", self.input_slice)
         print("Labels slice", self.labels_slice)
         print("Window size", self.total_window_size)
-        print("Label columns", features)
 
         inputs = features[:, self.input_slice, :]
         labels = features[:, self.labels_slice, :]
