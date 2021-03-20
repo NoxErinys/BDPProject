@@ -10,9 +10,10 @@ import matplotlib.pyplot as plt
 
 class MatPlotLibVisualizer(Visualizer):
 
-    def __init__(self, number_of_plotted_stocks=3, clear_interval=100):
+    def __init__(self, number_of_plotted_stocks=3, clear_interval=100, show_interval: timedelta=timedelta(minutes=15)):
         plt.ion()
 
+        self.show_interval = show_interval
         self.clear_interval = clear_interval * 2
         self.cycle = 0
 
@@ -49,11 +50,11 @@ class MatPlotLibVisualizer(Visualizer):
                 self.plots[stock].set_title(stock + " prediction")
 
             last_point = stocks[stock][len(stocks[stock]) - 1]
-            self.plots[stock].set_xlim(last_point.current_timestamp - timedelta(minutes=15),
+            self.plots[stock].set_xlim(last_point.current_timestamp - self.show_interval,
                                        last_point.predicted_timestamp)
 
             self.plots[stock].plot([p.current_timestamp for p in stocks[stock]],
-                                   [p.current_price for p in stocks[stock]], 'b-')
+                                   [p.current_price for p in stocks[stock]], 'b-+')
 
             self.plots[stock].plot([p.predicted_timestamp for p in stocks[stock]],
                                    [p.predicted_price for p in stocks[stock]], 'r*-')

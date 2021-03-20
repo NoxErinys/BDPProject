@@ -1,5 +1,5 @@
 from typing import List, Dict
-from datetime import datetime
+from datetime import datetime, timedelta
 from abc import ABC, abstractmethod
 
 
@@ -28,6 +28,9 @@ class Prediction:
         self.current_price = current_price
         self.predicted_price = predicted_price
 
+    def __repr__(self):
+        return f"{self.stock}: {self.current_price} at {self.current_timestamp} | {self.predicted_price} at {self.predicted_timestamp}"
+
 
 class DataCollector(ABC):
 
@@ -49,9 +52,10 @@ class DataCollector(ABC):
 
 class Predictor(ABC):
 
-    def __init__(self, stock: str, window: int, epochs: int):
-        self.window = window
+    def __init__(self, stock: str, data_interval: timedelta, window: int=100, epochs: int=32):
         self.stock = stock
+        self.data_interval = data_interval
+        self.window = window
         self.epochs = epochs
 
     @abstractmethod

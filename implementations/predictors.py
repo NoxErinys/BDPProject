@@ -5,72 +5,115 @@ import matplotlib.pyplot as plt
 import numpy as np
 import tensorflow as tf
 
+LABEL_INDEX = 2
+
 
 class RNNPredictor(Predictor):
 
-    def __init__(self, stock: str, window: int, epochs: int):
-        super().__init__(stock, window, epochs)
-
-        self.last_batch = []
+    def __init__(self, stock: str, data_interval: timedelta, window: int=100, epochs: int=32, dev_mode: bool=False):
+        super().__init__(stock, data_interval, window, epochs)
+        self.dev_mode = dev_mode
 
         self.model = tf.keras.models.Sequential([
             tf.keras.layers.LSTM(64, return_sequences=True),
             tf.keras.layers.Dense(units=1)
         ])
 
-        self.early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=2, mode='min')
+        self.early_stopping = tf.keras.callbacks.EarlyStopping(monitor='val_loss', patience=3, mode='min')
+        self.early_stopping_single = tf.keras.callbacks.EarlyStopping(monitor='loss', patience=3, mode='min')
         self.model.compile(loss=tf.losses.MeanSquaredError(), optimizer=tf.optimizers.Adam(),
                            metrics=[tf.metrics.MeanAbsoluteError()])
 
+        self.mean = []
+        self.std = []
+        self.last_batch = []
+
     def train(self, data: List[DataPoint]):
         ordered_data = sorted(data, key=lambda x: x.timestamp)
-        ordered_data = [self.data_point_to_array(d) for d in ordered_data]
+        ordered_data = np.array([self.data_point_to_array(d) for d in ordered_data], dtype=np.float32)
         print("Number of inputs: ", len(ordered_data))
 
-        n = len(ordered_data)
-        train_data = ordered_data[0:int(n * 0.7)]
-        val_data = ordered_data[int(n * 0.7):int(n * 0.9)]
-        test_data = ordered_data[int(n * 0.9):]
+        if self.dev_mode:
+            # Run some tests
+            n = len(ordered_data)
+            train_data = ordered_data[0:int(n * 0.7)]
+            val_data = ordered_data[int(n * 0.7):int(n * 0.9)]
+            test_data = ordered_data[int(n * 0.9):]
 
-        self.model.fit(self.make_dataset(train_data), validation_data=self.make_dataset(val_data),
-                       epochs=self.epochs, callbacks=[self.early_stopping])
+            self.mean = np.mean(train_data, axis=0)
+            self.std = np.std(train_data, axis=0)
 
-        self.last_batch = ordered_data[-1 * self.window:]
+            train_data = (train_data - self.mean) / self.std
+            val_data = (val_data - self.mean) / self.std
+            test_data = (test_data - self.mean) / self.std
 
-        inputs, labels = next(iter(self.make_dataset(test_data)))
+            self.model.fit(self.make_dataset(train_data), validation_data=self.make_dataset(val_data),
+                           epochs=self.epochs, callbacks=[self.early_stopping])
 
-        print(len(inputs))
-        print(len(labels))
+            inputs, labels = next(iter(self.make_dataset(test_data)))
+            plt.plot([i for i in range(self.window - 1)],
+                     labels[0, :, 0] * self.std[2] + self.mean[2], 'b-', label="Actual")
 
-        plt.plot([i for i in range(self.window - 1)],
-                 labels[0, :, 0], 'b-', label="Actual")
+            predictions = self.model(inputs)
+            plt.plot([i for i in range(self.window - 1)],
+                     predictions[0, :, 0] * self.std[2] + self.mean[2], 'r-*', label="Predictions")
 
-        predictions = self.model(inputs)
-        plt.plot([i for i in range(self.window - 1)],
-                 predictions[0, :, 0], 'r-*', label="Predictions")
-        plt.legend()
-        plt.show()
+            plt.legend()
+            plt.show()
+
+        else:
+            train_data = ordered_data[0:int(len(ordered_data) * 0.8)][:]
+            val_data = ordered_data[int(len(ordered_data) * 0.8):][:]
+
+            self.mean = np.mean(train_data, axis=0)
+            self.std = np.std(train_data, axis=0)
+
+            train_data = (train_data - self.mean) / self.std
+            val_data = (val_data - self.mean) / self.std
+            ordered_data = (ordered_data - self.mean) / self.std
+
+            self.model.fit(self.make_dataset(train_data), validation_data=self.make_dataset(val_data),
+                           epochs=self.epochs, callbacks=[self.early_stopping])
+
+        self.last_batch = ordered_data[-1 * (self.window - 1):]
 
     def predict_next_price(self, current_data_point: DataPoint) -> Prediction:
-        pass
-        # BOTH, INDIVIDUALLY
+        inputs, labels = next(iter(self.make_dataset(np.concatenate((self.last_batch,
+                                                                    [self.data_point_to_array(current_data_point)])))))
+        predictions = self.model(inputs).numpy()
+        last_batch = predictions[len(predictions) - 1]
+        prediction = last_batch[len(last_batch) - 1][0]
+
+        return Prediction(self.stock, current_data_point.timestamp, current_data_point.timestamp + self.data_interval,
+                          current_data_point.close_price, prediction * self.std[LABEL_INDEX] + self.mean[LABEL_INDEX])
 
     def update_model(self, actual_data_point: DataPoint):
-        pass
-        # BOTH, INDIVIDUALLY
+        self.last_batch = np.concatenate((self.last_batch, [self.data_point_to_array(actual_data_point)]))
+
+        # This should add on-top of the existing model, according to this:
+        # https://github.com/keras-team/keras/issues/4446
+        self.model.fit(self.make_dataset(self.last_batch), epochs=int(self.epochs / 2),
+                       callbacks=[self.early_stopping_single])
+
+        self.last_batch = self.last_batch[1:len(self.last_batch)]
 
     def data_point_to_array(self, point: DataPoint):
-        return [point.timestamp.minute, point.volume, point.close_price]
+        point = np.array([point.timestamp.minute, point.volume, point.close_price, point.open_price,
+                          point.lowest_price, point.highest_price])
+
+        if len(self.std) == 0:
+            return point
+        else:
+            return (point - self.mean) / self.std
 
     def make_dataset(self, data):
-        data = np.array(data, dtype=np.float32)
         ds = tf.keras.preprocessing.timeseries_dataset_from_array(
             data=data,
             targets=None,
             sequence_length=self.window,
             sequence_stride=1,
             shuffle=False,
-            batch_size=32, )
+            batch_size=64, )
 
         ds = ds.map(self.split_window)
         return ds
@@ -78,7 +121,7 @@ class RNNPredictor(Predictor):
     def split_window(self, features):
         inputs = features[:, slice(0, self.window - 1), :]
         labels = features[:, slice(1, None), :]
-        labels = tf.stack([labels[:, :, 2]], axis=-1)  # index 2 = close_price
+        labels = tf.stack([labels[:, :, LABEL_INDEX]], axis=-1)
 
         inputs.set_shape([None, self.window - 1, None])
         labels.set_shape([None, self.window - 1, None])
@@ -86,29 +129,45 @@ class RNNPredictor(Predictor):
         return inputs, labels
 
 
+class ImpairedRNNPredictor(RNNPredictor):
+
+    def __init__(self, stock: str, data_interval: timedelta, window: int=100, epochs: int=32, dev_mode: bool=False):
+        super().__init__(stock, data_interval, window, epochs)
+
+    def update_model(self, actual_data_point: DataPoint):
+        self.last_batch = np.concatenate((self.last_batch, [self.data_point_to_array(actual_data_point)]))
+        self.last_batch = self.last_batch[1:len(self.last_batch)]
+
+
 def test():
     from implementations.data_collectors import YahooDataCollector
+    from implementations.visualizer import MatPlotLibVisualizer
+    from time import sleep
 
+    number_of_predictions = 100
+    stock = 'GME'
+
+    visualizer = MatPlotLibVisualizer(1, show_interval=timedelta(minutes=number_of_predictions))
     data_collector = YahooDataCollector(60)
-    historical_data = data_collector.get_historical_data('AAPL', datetime(2021, 3, 5, 10, 15))
+    historical_data = data_collector.get_historical_data(stock, datetime(2021, 3, 18, 10, 15), number_of_days=25)
 
-    """
-    time_points = [
-        data_collector.get_latest_data_point(['AAPL'], datetime(2021, 3, 5, 10, 16))['AAPL'],
-        data_collector.get_latest_data_point(['AAPL'], datetime(2021, 3, 5, 10, 17))['AAPL'],
-        data_collector.get_latest_data_point(['AAPL'], datetime(2021, 3, 5, 10, 18))['AAPL'],
-        data_collector.get_latest_data_point(['AAPL'], datetime(2021, 3, 5, 10, 19))['AAPL'],
-        data_collector.get_latest_data_point(['AAPL'], datetime(2021, 3, 5, 10, 20))['AAPL'],
-        data_collector.get_latest_data_point(['AAPL'], datetime(2021, 3, 5, 10, 21))['AAPL'],
-        data_collector.get_latest_data_point(['AAPL'], datetime(2021, 3, 5, 10, 22))['AAPL'],
-        data_collector.get_latest_data_point(['AAPL'], datetime(2021, 3, 5, 10, 23))['AAPL'],
-        data_collector.get_latest_data_point(['AAPL'], datetime(2021, 3, 5, 10, 24))['AAPL'],
-        data_collector.get_latest_data_point(['AAPL'], datetime(2021, 3, 5, 10, 25))['AAPL']
-    ]
-    """
-
-    predictor = RNNPredictor('AAPL', 25, 10)
+    predictor = RNNPredictor(stock, timedelta(minutes=1), 100, 40)
     predictor.train(historical_data)
+
+    predictions = []
+
+    for index in range(number_of_predictions):
+        point = data_collector.get_latest_data_point([stock], datetime(2021, 3, 18, 10, 16) + \
+                                                              timedelta(minutes=index))[stock]
+        if index > 0:
+            predictor.update_model(point)
+
+        prediction = predictor.predict_next_price(point)
+        predictions.append(prediction)
+        visualizer.update_predictions_plot(predictions)
+
+    while True:
+        sleep(1)
 
 
 if __name__ == '__main__':

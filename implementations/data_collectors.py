@@ -43,7 +43,7 @@ class YahooDataCollector(DataCollector):
             start_time = (current_time - timedelta(days=i + 1)).strftime("%Y-%m-%d")
             end_time = (current_time - timedelta(days=i)).strftime("%Y-%m-%d")
 
-            historical_data_path = "../datasets/historical_data/"
+            historical_data_path = "./datasets/historical_data/"
             folder_path = historical_data_path + start_time + "/"
             try:
                 Path(folder_path).mkdir(parents=True, exist_ok=True)
@@ -106,7 +106,7 @@ class YahooDataCollector(DataCollector):
             start_time = (current_time - timedelta(days=i)).strftime("%Y-%m-%d")
             end_time = (current_time - timedelta(days=i - 1)).strftime("%Y-%m-%d")
 
-            historical_data_path = "../datasets/historical_data/"
+            historical_data_path = "./datasets/historical_data/"
             folder_path = historical_data_path + start_time + "/"
             try:
                 Path(folder_path).mkdir(parents=True, exist_ok=True)

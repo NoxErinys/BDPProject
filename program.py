@@ -27,8 +27,8 @@ def main(start_date):
     for stock in top_stocks:
         stock_data = data_collector.get_historical_data(stock, start_date, NUMBER_OF_TRAINING_DAYS)
 
-        bots[0].predictors[stock] = RNNPredictor(stock)
-        bots[1].predictors[stock] = ImpairedRNNPredictor(stock)
+        bots[0].predictors[stock] = RNNPredictor(stock, timedelta(seconds=INTERVAL_IN_SECONDS))
+        bots[1].predictors[stock] = ImpairedRNNPredictor(stock, timedelta(seconds=INTERVAL_IN_SECONDS))
 
         for bot in bots:
             bot.predictors[stock].train(stock_data)
@@ -41,7 +41,7 @@ def main(start_date):
         latest_data = data_collector.get_latest_data_point(top_stocks, current_date)
         predictions_to_plot = []
 
-        for bot in bots:
+        for bot_index, bot in enumerate(bots):
             predictions = []
 
             for index, stock in enumerate(top_stocks):
@@ -51,7 +51,7 @@ def main(start_date):
                 predictor.update_model(current_data_point)
                 prediction = predictor.predict_next_price(current_data_point)
 
-                if index < NUMBER_OF_PREDICTION_PLOTS:
+                if index < NUMBER_OF_PREDICTION_PLOTS and bot_index == 0:
                     predictions_to_plot.append(prediction)
 
                 predictions.append(prediction)
