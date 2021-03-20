@@ -33,7 +33,7 @@ def main(start_date):
         for bot in bots:
             bot.predictors[stock].train(stock_data)
 
-    current_date = start_date
+    initial_date, current_date = start_date, start_date
     end_date = start_date + timedelta(hours=8)
     last_predictions = []
 
@@ -48,7 +48,9 @@ def main(start_date):
                 current_data_point = latest_data[stock]
                 predictor = bot.predictors[stock]
 
-                predictor.update_model(current_data_point)
+                if current_date > initial_date:
+                    predictor.update_model(current_data_point)
+
                 prediction = predictor.predict_next_price(current_data_point)
 
                 if index < NUMBER_OF_PREDICTION_PLOTS and bot_index == 0:

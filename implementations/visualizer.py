@@ -54,10 +54,13 @@ class MatPlotLibVisualizer(Visualizer):
                                        last_point.predicted_timestamp)
 
             self.plots[stock].plot([p.current_timestamp for p in stocks[stock]],
-                                   [p.current_price for p in stocks[stock]], 'b-+')
+                                   [p.current_price for p in stocks[stock]], 'b-+', label="Actual price")
 
             self.plots[stock].plot([p.predicted_timestamp for p in stocks[stock]],
-                                   [p.predicted_price for p in stocks[stock]], 'r*-')
+                                   [p.predicted_price for p in stocks[stock]], 'r*-', label="Predicted price")
+
+            if self.plots[stock].legend_ is None:
+                self.plots[stock].legend(loc="upper right")
 
         self.redraw()
 

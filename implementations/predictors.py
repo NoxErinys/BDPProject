@@ -15,7 +15,7 @@ class RNNPredictor(Predictor):
         self.dev_mode = dev_mode
 
         self.model = tf.keras.models.Sequential([
-            tf.keras.layers.LSTM(64, return_sequences=True),
+            tf.keras.layers.GRU(64, return_sequences=True),
             tf.keras.layers.Dense(units=1)
         ])
 
@@ -146,10 +146,11 @@ def test():
 
     number_of_predictions = 100
     stock = 'GME'
+    date = datetime(2021, 3, 18, 9, 35)
 
     visualizer = MatPlotLibVisualizer(1, show_interval=timedelta(minutes=number_of_predictions))
     data_collector = YahooDataCollector(60)
-    historical_data = data_collector.get_historical_data(stock, datetime(2021, 3, 18, 10, 15), number_of_days=25)
+    historical_data = data_collector.get_historical_data(stock, date, number_of_days=25)
 
     predictor = RNNPredictor(stock, timedelta(minutes=1), 100, 40)
     predictor.train(historical_data)
@@ -157,14 +158,15 @@ def test():
     predictions = []
 
     for index in range(number_of_predictions):
-        point = data_collector.get_latest_data_point([stock], datetime(2021, 3, 18, 10, 16) + \
-                                                              timedelta(minutes=index))[stock]
+        point = data_collector.get_latest_data_point([stock], date + timedelta(minutes=index + 1))[stock]
+
         if index > 0:
             predictor.update_model(point)
 
         prediction = predictor.predict_next_price(point)
         predictions.append(prediction)
         visualizer.update_predictions_plot(predictions)
+
 
     while True:
         sleep(1)
