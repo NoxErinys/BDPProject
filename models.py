@@ -1,6 +1,9 @@
 from typing import List, Dict
 from datetime import datetime, timedelta
 from abc import ABC, abstractmethod
+import logging
+import jsonpickle
+import pathlib
 
 
 class DataPoint:
@@ -92,13 +95,19 @@ class StockBalanceSheet:
     def get_current_unrealized_profit(self, current_price: float):
         return self._available_stocks * current_price
 
-    def get_available_amount(self, timestamp: datetime):
+    def get_available_stocks_average_price(self):
+        stock_purchases = [p for p in self.purchases if p.amount > 0]
+
+        return sum([p.amount * p.price for p in stock_purchases]) /\
+               sum([p.amount for p in stock_purchases])
+
+    def get_available_amount_at_time(self, timestamp: datetime):
         return sum([p.amount for p in self.purchases if p.timestamp <= timestamp])
 
-    def get_unrealized_profit(self, price_at_timestamp: float, timestamp: datetime):
-        return self.get_available_amount(timestamp) * price_at_timestamp
+    def get_unrealized_profit_at_time(self, price_at_timestamp: float, timestamp: datetime):
+        return self.get_available_amount_at_time(timestamp) * price_at_timestamp
 
-    def get_value(self, timestamp: datetime):
+    def get_total_value_at_time(self, timestamp: datetime):
         return sum([p.amount * p.price * -1 for p in self.purchases if p.timestamp <= timestamp])
 
     def buy(self, amount: float, price: float, timestamp: datetime):
@@ -124,24 +133,32 @@ class Trader(ABC):
         self.initial_balance = balance
         self.balance = balance
         self.balance_sheet: Dict[str, StockBalanceSheet] = {}
+        self.is_loaded_from_file = False
 
     @abstractmethod
     def trade(self, predictions: List[Prediction]):
         pass
 
     def buy(self, stock: str, amount: float, price: float, timestamp: datetime):
+        if self.balance - amount * price < 0:
+            raise Exception("Can't buy more than the available balance")
+
         if stock not in self.balance_sheet:
             self.balance_sheet[stock] = StockBalanceSheet(stock, [])
 
         self.balance -= self.balance_sheet[stock].buy(amount, price, timestamp)
+        logging.info("{trader_name} BOUGHT {amount} of {stock}. Balance now: {balance}",
+                     trader_name=self.name, stock=stock, amount=amount, balance=self.balance)
 
     def sell(self, stock: str, amount: float, price: float, timestamp: datetime):
         if stock not in self.balance_sheet:
-            raise Exception("Can't sell srtock because it's not owned")
+            raise Exception("Can't sell stock because it's not owned")
 
         self.balance += self.balance_sheet[stock].sell(amount, price, timestamp)
+        logging.info("{trader_name} SOLD {amount} of {stock}. Balance now: {balance}",
+                     trader_name=self.name, stock=stock, amount=amount, balance=self.balance)
 
-    def get_current_available_amount(self, stock: str):
+    def get_currently_available_amount_for_stock(self, stock: str):
         if stock not in self.balance_sheet:
             return 0
 
@@ -151,11 +168,29 @@ class Trader(ABC):
         return self.balance +\
             sum([s.get_current_unrealized_profit(stock_prices[s.stock_name]) for s in self.balance_sheet.values()])
 
-    def get_net_worth(self, timestamp: datetime, stock_prices: Dict[str, float]):
-        balance = self.initial_balance + sum([s.get_value(timestamp) for s in self.balance_sheet.values()])
+    def get_net_worth_at_time(self, timestamp: datetime, stock_prices: Dict[str, float]):
+        balance = self.initial_balance + sum([s.get_total_value_at_time(timestamp)
+                                              for s in self.balance_sheet.values()])
 
         return balance + \
-            sum([s.get_unrealized_profit(stock_prices[s.stock_name], timestamp) for s in self.balance_sheet.values()])
+            sum([s.get_unrealized_profit_at_time(stock_prices[s.stock_name], timestamp)
+                 for s in self.balance_sheet.values()])
+
+    def save_data(self, file_path):
+        path = pathlib.Path(file_path)
+        path.parent.mkdir(parents=True, exist_ok=True)
+
+        with open(file_path, 'w') as out_file:
+            out_file.write(jsonpickle.encode(self, indent=4))
+
+    @staticmethod
+    def load_data(file_path):
+        with open(file_path, 'r') as out_file:
+            data = out_file.read()
+            trader_data = jsonpickle.decode(data)
+            trader_data.is_loaded_from_file = True
+
+            return trader_data
 
 
 class Visualizer(ABC):
@@ -171,6 +206,6 @@ class Visualizer(ABC):
 
 class Bot:
 
-    def __init__(self, trader: Trader, predictiors: Dict[str, Predictor]):
+    def __init__(self, trader: Trader, predictors: Dict[str, Predictor]):
         self.trader = trader
-        self.predictors = predictiors
+        self.predictors = predictors

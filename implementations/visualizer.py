@@ -57,10 +57,12 @@ class MatPlotLibVisualizer(Visualizer):
                                    [p.current_price for p in stocks[stock]], 'b-+', label="Actual price")
 
             self.plots[stock].plot([p.predicted_timestamp for p in stocks[stock]],
-                                   [p.predicted_price for p in stocks[stock]], 'r*-', label="Predicted price")
+                                   [p.predicted_price for p in stocks[stock]], 'r*-', label="Best predicted price")
 
             if self.plots[stock].legend_ is None:
                 self.plots[stock].legend(loc="upper right")
+                self.plots[stock].set_xlabel("Time")
+                self.plots[stock].set_ylabel("Stock price (USD)")
 
         self.redraw()
 
@@ -71,7 +73,9 @@ class MatPlotLibVisualizer(Visualizer):
 
         trading_data = {}
         for trader in traders:
-            net_worth = trader.get_current_net_worth(current_prices)
+            net_worth = trader.get_net_worth_at_time(timestamp, current_prices) if trader.is_loaded_from_file else\
+                        trader.get_current_net_worth(current_prices)
+
             trading_data[trader.name] = [timestamp, net_worth]
 
             color = next((c for c in self.color_mapping if self.color_mapping[c] == trader.name), None)
@@ -88,6 +92,8 @@ class MatPlotLibVisualizer(Visualizer):
 
         if self.plots['trading'].legend_ is None and self.last_trading_data != {}:
             self.plots['trading'].legend(loc="upper right")
+            self.plots['trading'].set_xlabel("Time")
+            self.plots['trading'].set_ylabel("Net worth (USD)")
 
         self.redraw()
         self.last_trading_data = trading_data
