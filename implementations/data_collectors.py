@@ -33,7 +33,7 @@ class YahooDataCollector(DataCollector):
     def get_top_stocks(self, current_time: datetime, number_of_stocks=100) -> List[str]:
 
         if current_time < datetime.now() + timedelta(days=-1):
-             return ['DECZ', 'ALACU', 'CRSAU', 'HMG', 'DBDRU', 'KTN', 'FEBZ', 'GSID', 'GECCM', 'RDIB', 'CMCTP', 'OCFCP', 'JBK', 'MACUU', 'GJT', 'LATNU', 'LSXMB', 'MAYS', 'LIVKU', 'ANDAU', 'IOR', 'CHPMU', 'GJH', 'GJR', 'ASRVP', 'RCHGU', 'CCZ', 'LACQU', 'SEPZ', 'DJUL', 'LEVLP', 'CGROU', 'ZGYHU', 'KTH', 'GGO', 'PSFD', 'FCRW', 'AIW', 'AMHCU', 'BROG', 'GFNCP', 'NAPR', 'PXSAP', 'TANNL', 'BRPAU', 'THCBU', 'BCYPU', 'GYRO', 'OBAS', 'TECTP', 'INBKL', 'GRNVU', 'PSCX', 'GLADL', 'REC', 'GSEE', 'THCAU', 'CFCV', 'ICCH', 'BLDG', 'TDACU', 'GJS', 'IBHF', 'LYFE', 'AVDG', 'HFBL', 'VBFC', 'IVLC', 'MDRRP', 'DGICB', 'PSMD', 'LUXE', 'MSVB', 'DIT', 'RILYI', 'MIG', 'EGIS', 'QADB', 'BWACU', 'PRTC', 'ELLO', 'OXSQZ', 'AVDR', 'MNSBP', 'JMPNL', 'IVSG', 'SLN', 'CKX', 'CBMB', 'CPHC', 'WVVIP', 'ARGD', 'ZIONN', 'BDL', 'MRSK', 'SVT', 'SAF', 'IVDG', 'WHLRP', 'SAK'][:number_of_stocks]
+             return ['CLVS', 'SNDL', 'HOFV', 'AAPL', 'AMC', 'ZOM', 'BAC', 'NIO', 'F', 'XOM', 'GE', 'T', 'SKLZ', 'CSCO', 'KO', 'WFC', 'PLTR', 'PLUG', 'INTC', 'JPM', 'MRK', 'SOS', 'TELL', 'AAL', 'HPQ', 'BBD', 'NOK', 'MSFT', 'ITUB', 'PFE', 'SENS', 'TSLA', 'GEVO', 'AMD', 'MRO', 'CCL', 'SIRI', 'VZ', 'FB', 'MO', 'PCG', 'RF', 'HBAN', 'ONTX', 'CMCSA', 'SWN', 'OPEN', 'FCX', 'VIAC', 'KEY', 'CTRM', 'RIG', 'NEM', 'NAKD', 'ORCL', 'VALE', 'OXY', 'PBR', 'BMY', 'V', 'DIS', 'FCEL', 'ET', 'IVR', 'TXMD', 'LI', 'UEC', 'TNXP', 'XPEV', 'LAZR', 'TME', 'NKE', 'MU', 'GME', 'COP', 'LKCO', 'OCGN', 'NLY', 'GM', 'CDEV', 'DKNG', 'KMI', 'C', 'USB', 'SLB', 'AMCR', 'NEE', 'BKR', 'SBUX', 'GOLD', 'ABEV', 'HAL', 'HL', 'KOS', 'TWTR', 'HPE', 'GNUS', 'PG', 'X', 'CLOV'][:number_of_stocks]
 
         # Spark dataframe will be populated with all stocks data
         spark_data_frame = self.spark.createDataFrame([], self.schema)
@@ -44,7 +44,7 @@ class YahooDataCollector(DataCollector):
         stocks_list = [stock for stock in lookup_table["Symbol"].tolist() if "^" not in stock and "/" not in stock]
         download_list = []
 
-        number_of_days_to_analyse = 7
+        number_of_days_to_analyse = 1
         for i in range(0, number_of_days_to_analyse):
             start_time = (current_time - timedelta(days=i + 1)).strftime("%Y-%m-%d")
             end_time = (current_time - timedelta(days=i + 1)).strftime("%Y-%m-%d")
@@ -99,7 +99,7 @@ class YahooDataCollector(DataCollector):
         # try to get top stocks
         top_stocks_list = self.spark.createDataFrame(pandas_data_frame, self.schema).groupBy("Symbol") \
             .agg({'Volume': 'avg'}) \
-            .sort("avg(Volume)") \
+            .sort("avg(Volume)", ascending=False) \
             .select("Symbol") \
             .limit(number_of_stocks) \
             .rdd.flatMap(lambda x: x).collect()
@@ -221,7 +221,6 @@ class YahooDataCollector(DataCollector):
             # spark_data_frame_for_stock = spark_data_frame_for_stock.union(self.spark.createDataFrame(stock_data, self.schema))
             # data_frame = self.spark.createDataFrame(stock_data, self.schema)
 
-        print(pandas_data_frame)
         spark_data_frame_for_stock = self.spark.createDataFrame(pandas_data_frame, self.schema)
         for stock in stocks:
             last_point_row = spark_data_frame_for_stock \
@@ -246,7 +245,7 @@ class YahooDataCollector(DataCollector):
 def test():
     yahoo_data_collector = YahooDataCollector(60)
 
-    # print(yahoo_data_collector.get_top_stocks(datetime(2021, 3, 21), 4))
+    print(yahoo_data_collector.get_top_stocks(datetime(2021, 3, 21), 100))
 
     # list_of_data_points = yahoo_data_collector.get_historical_data("AAPL", datetime(2021, 3, 17), 2)
     # print([f'{data_point.timestamp}| volume: {data_point.volume}, close: {data_point.close_price}' for data_point in list_of_data_points])
