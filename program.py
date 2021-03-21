@@ -1,4 +1,6 @@
 from models import *
+import seqlog
+import logging
 from implementations.data_collectors import *
 from implementations.predictors import *
 from implementations.traders import *
@@ -15,14 +17,15 @@ NUMBER_OF_TRAINING_DAYS = 10
 def main(start_date):
     production_mode = (datetime.now() - start_date).days <= 1
     data_collector = YahooDataCollector(INTERVAL_IN_SECONDS)
-    visualizer = MatPlotLibVisualizer()
+    visualizer = None if production_mode else \
+        MatPlotLibVisualizer(NUMBER_OF_PREDICTION_PLOTS, show_interval=timedelta(minutes=20))
 
     bots = [
         Bot(SafeTrader("Good LSTM Trader", TRADER_BALANCE), {}),
         Bot(SafeTrader("Bad LSTM Trader", TRADER_BALANCE), {})
     ]
 
-    top_stocks = data_collector.get_top_stocks(start_date)
+    top_stocks = data_collector.get_top_stocks(start_date, number_of_stocks=100)
 
     for stock in top_stocks:
         stock_data = data_collector.get_historical_data(stock, start_date, NUMBER_OF_TRAINING_DAYS)
@@ -33,12 +36,13 @@ def main(start_date):
         for bot in bots:
             bot.predictors[stock].train(stock_data)
 
-    initial_date, current_date = start_date, start_date
+    current_date = start_date
     end_date = start_date + timedelta(hours=8)
     last_predictions = []
 
     while current_date < end_date:
         latest_data = data_collector.get_latest_data_point(top_stocks, current_date)
+        stock_prices = {d[0]: d[1].close_price for d in latest_data.items()}
         predictions_to_plot = []
 
         for bot_index, bot in enumerate(bots):
@@ -48,25 +52,26 @@ def main(start_date):
                 current_data_point = latest_data[stock]
                 predictor = bot.predictors[stock]
 
-                if current_date > initial_date:
+                if current_date > start_date:
                     predictor.update_model(current_data_point)
 
                 prediction = predictor.predict_next_price(current_data_point)
 
-                if index < NUMBER_OF_PREDICTION_PLOTS and bot_index == 0:
+                if not production_mode and index < NUMBER_OF_PREDICTION_PLOTS and bot_index == 0:
                     predictions_to_plot.append(prediction)
 
                 predictions.append(prediction)
 
             bot.trader.trade(predictions)
-
-        visualizer.update_predictions_plot(last_predictions + predictions_to_plot)
-        visualizer.update_traders_plot(current_date, [b.trader for b in bots],
-                                       {d[0]: d[1].close_price for d in latest_data.items()})
-
-        last_predictions = predictions_to_plot
+            logging.info("{trader_name} has now a net worth of {net_worth}",
+                         bot.trader.name, bot.trader.get_current_net_worth(stock_prices))
 
         if not production_mode:
+            visualizer.update_predictions_plot(last_predictions + predictions_to_plot)
+            visualizer.update_traders_plot(current_date, [b.trader for b in bots], stock_prices)
+
+            last_predictions = predictions_to_plot
+
             current_date += timedelta(seconds=INTERVAL_IN_SECONDS)
         else:
             execution_time = (datetime.now() - current_date).total_seconds()
@@ -78,4 +83,13 @@ def main(start_date):
 
 
 if __name__ == '__main__':
-    main(datetime(2020, 5, 17))
+    seqlog.log_to_seq(
+        server_url="http://localhost:5341/",
+        api_key="",
+        level=logging.INFO,
+        batch_size=10,
+        auto_flush_timeout=10,
+        override_root_logger=True,
+    )
+
+    main(datetime(2021, 3, 18))
