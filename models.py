@@ -139,7 +139,7 @@ class Trader(ABC):
     def trade(self, predictions: List[Prediction]):
         pass
 
-    def buy(self, stock: str, amount: float, price: float, timestamp: datetime):
+    def buy(self, stock: str, amount: float, price: float, timestamp: datetime, predicted_price=None):
         if self.balance - amount * price < 0:
             raise Exception("Can't buy more than the available balance")
 
@@ -147,16 +147,18 @@ class Trader(ABC):
             self.balance_sheet[stock] = StockBalanceSheet(stock, [])
 
         self.balance -= self.balance_sheet[stock].buy(amount, price, timestamp)
-        logging.info("{trader_name} BOUGHT {amount} of {stock}. Balance now: {balance}",
-                     trader_name=self.name, stock=stock, amount=amount, balance=self.balance)
+        logging.info("{trader_name} BOUGHT {amount} of {stock} at {price} because of prediction {prediction}. " +
+                     "Balance now: {balance}", trader_name=self.name, stock=stock, amount=amount, price=price,
+                                               prediction=str(predicted_price), balance=self.balance)
 
-    def sell(self, stock: str, amount: float, price: float, timestamp: datetime):
+    def sell(self, stock: str, amount: float, price: float, timestamp: datetime, predicted_price=None):
         if stock not in self.balance_sheet:
             raise Exception("Can't sell stock because it's not owned")
 
         self.balance += self.balance_sheet[stock].sell(amount, price, timestamp)
-        logging.info("{trader_name} SOLD {amount} of {stock}. Balance now: {balance}",
-                     trader_name=self.name, stock=stock, amount=amount, balance=self.balance)
+        logging.info("{trader_name} SOLD {amount} of {stock} at {price} because of prediction {prediction}. " +
+                     "Balance now: {balance}", trader_name=self.name, stock=stock, amount=amount, price=price,
+                                               prediction=str(predicted_price), balance=self.balance)
 
     def get_currently_available_amount_for_stock(self, stock: str):
         if stock not in self.balance_sheet:

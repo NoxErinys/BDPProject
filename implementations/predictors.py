@@ -10,12 +10,13 @@ LABEL_INDEX = 2
 
 class RNNPredictor(Predictor):
 
-    def __init__(self, stock: str, data_interval: timedelta, window: int=100, epochs: int=32, dev_mode: bool=False):
+    def __init__(self, stock: str, data_interval: timedelta, window: int=100, epochs: int=40, dev_mode: bool=False):
         super().__init__(stock, data_interval, window, epochs)
         self.dev_mode = dev_mode
 
         self.model = tf.keras.models.Sequential([
             tf.keras.layers.GRU(64, return_sequences=True),
+            tf.keras.layers.LSTM(32, return_sequences=True),
             tf.keras.layers.Dense(units=1)
         ])
 
@@ -144,7 +145,7 @@ def test():
     from implementations.visualizer import MatPlotLibVisualizer
     from time import sleep
 
-    number_of_predictions = 100
+    number_of_predictions = 30
     stock = 'GME'
     date = datetime(2021, 3, 18, 9, 35)
 
@@ -152,7 +153,7 @@ def test():
     data_collector = YahooDataCollector(60)
     historical_data = data_collector.get_historical_data(stock, date, number_of_days=25)
 
-    predictor = RNNPredictor(stock, timedelta(minutes=1), 100, 40)
+    predictor = ImpairedRNNPredictor(stock, timedelta(minutes=1), 100, 20)
     predictor.train(historical_data)
 
     predictions = []
@@ -166,7 +167,6 @@ def test():
         prediction = predictor.predict_next_price(point)
         predictions.append(prediction)
         visualizer.update_predictions_plot(predictions)
-
 
     while True:
         sleep(1)

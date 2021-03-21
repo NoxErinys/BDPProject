@@ -3,7 +3,6 @@ from models import Visualizer, Trader, Prediction
 from datetime import datetime, timedelta
 from random import randint
 from time import sleep
-from implementations.traders import SafeTrader
 
 import matplotlib.pyplot as plt
 
@@ -17,7 +16,7 @@ class MatPlotLibVisualizer(Visualizer):
         self.clear_interval = clear_interval * 2
         self.cycle = 0
 
-        self.fig = plt.figure(constrained_layout=True)
+        self.fig = plt.figure(constrained_layout=True, figsize=(24, 12))
         self.gs = self.fig.add_gridspec(2, number_of_plotted_stocks)
 
         self.plots = {}
@@ -60,7 +59,7 @@ class MatPlotLibVisualizer(Visualizer):
                                    [p.predicted_price for p in stocks[stock]], 'r*-', label="Best predicted price")
 
             if self.plots[stock].legend_ is None:
-                self.plots[stock].legend(loc="upper right")
+                self.plots[stock].legend(loc="lower left")
                 self.plots[stock].set_xlabel("Time")
                 self.plots[stock].set_ylabel("Stock price (USD)")
 
@@ -91,7 +90,7 @@ class MatPlotLibVisualizer(Visualizer):
                                        label=trader.name, color=color)
 
         if self.plots['trading'].legend_ is None and self.last_trading_data != {}:
-            self.plots['trading'].legend(loc="upper right")
+            self.plots['trading'].legend(loc="lower left")
             self.plots['trading'].set_xlabel("Time")
             self.plots['trading'].set_ylabel("Net worth (USD)")
 

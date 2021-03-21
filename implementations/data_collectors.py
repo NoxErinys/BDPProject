@@ -33,14 +33,23 @@ class YahooDataCollector(DataCollector):
     def get_top_stocks(self, current_time: datetime, number_of_stocks=100) -> List[str]:
 
         if current_time < datetime.now() + timedelta(days=-1):
-             return ['CLVS', 'SNDL', 'HOFV', 'AAPL', 'AMC', 'ZOM', 'BAC', 'NIO', 'F', 'XOM', 'GE', 'T', 'SKLZ', 'CSCO', 'KO', 'WFC', 'PLTR', 'PLUG', 'INTC', 'JPM', 'MRK', 'SOS', 'TELL', 'AAL', 'HPQ', 'BBD', 'NOK', 'MSFT', 'ITUB', 'PFE', 'SENS', 'TSLA', 'GEVO', 'AMD', 'MRO', 'CCL', 'SIRI', 'VZ', 'FB', 'MO', 'PCG', 'RF', 'HBAN', 'ONTX', 'CMCSA', 'SWN', 'OPEN', 'FCX', 'VIAC', 'KEY', 'CTRM', 'RIG', 'NEM', 'NAKD', 'ORCL', 'VALE', 'OXY', 'PBR', 'BMY', 'V', 'DIS', 'FCEL', 'ET', 'IVR', 'TXMD', 'LI', 'UEC', 'TNXP', 'XPEV', 'LAZR', 'TME', 'NKE', 'MU', 'GME', 'COP', 'LKCO', 'OCGN', 'NLY', 'GM', 'CDEV', 'DKNG', 'KMI', 'C', 'USB', 'SLB', 'AMCR', 'NEE', 'BKR', 'SBUX', 'GOLD', 'ABEV', 'HAL', 'HL', 'KOS', 'TWTR', 'HPE', 'GNUS', 'PG', 'X', 'CLOV'][:number_of_stocks]
+            return ['CLVS', 'AAPL', 'GME', 'AMC', 'SNDL', 'HOFV', 'ZOM', 'BAC', 'NIO', 'F', 'XOM', 'GE', 'T', 'SKLZ',
+                     'CSCO', 'KO', 'WFC', 'PLTR', 'PLUG', 'INTC', 'JPM', 'MRK', 'SOS', 'TELL', 'AAL', 'HPQ', 'BBD',
+                     'NOK', 'MSFT', 'ITUB', 'PFE', 'SENS', 'TSLA', 'GEVO', 'AMD', 'MRO', 'CCL', 'SIRI', 'VZ', 'FB',
+                     'MO', 'PCG', 'RF', 'HBAN', 'ONTX', 'CMCSA', 'SWN', 'OPEN', 'FCX', 'VIAC', 'KEY', 'CTRM', 'RIG',
+                     'NEM', 'NAKD', 'ORCL', 'VALE', 'OXY', 'PBR', 'BMY', 'V', 'DIS', 'FCEL', 'ET', 'IVR', 'TXMD', 'LI',
+                     'UEC', 'TNXP', 'XPEV', 'LAZR', 'TME', 'NKE', 'MU', 'COP', 'LKCO', 'OCGN', 'NLY', 'GM', 'CDEV',
+                     'DKNG', 'KMI', 'C', 'USB', 'SLB', 'AMCR', 'NEE', 'BKR', 'SBUX', 'GOLD', 'ABEV', 'HAL', 'HL',
+                     'KOS', 'TWTR', 'HPE', 'GNUS', 'PG', 'X', 'CLOV'][:number_of_stocks]
 
         # Spark dataframe will be populated with all stocks data
         spark_data_frame = self.spark.createDataFrame([], self.schema)
         pandas_data_frame = pandas\
             .DataFrame(columns=['Datetime', 'Open', 'High', 'Low', 'Close', 'AdjustedClose', 'Volume', 'Symbol'])
 
-        lookup_table = pandas.read_csv("../datasets/nasdaq_lookup_table/nasdaq_lookup.csv", sep=";").sort_values("Volume", ascending=False).head(500)
+        lookup_table = pandas.read_csv("./datasets/nasdaq_lookup_table/nasdaq_lookup.csv", sep=";")\
+                             .sort_values("Volume", ascending=False).head(500)
+
         stocks_list = [stock for stock in lookup_table["Symbol"].tolist() if "^" not in stock and "/" not in stock]
         download_list = []
 
@@ -49,7 +58,7 @@ class YahooDataCollector(DataCollector):
             start_time = (current_time - timedelta(days=i + 1)).strftime("%Y-%m-%d")
             end_time = (current_time - timedelta(days=i + 1)).strftime("%Y-%m-%d")
 
-            historical_data_path = "../datasets/historical_data_day/"
+            historical_data_path = "./datasets/historical_data_day/"
             folder_path = historical_data_path + start_time + "/"
             try:
                 Path(folder_path).mkdir(parents=True, exist_ok=True)
@@ -113,7 +122,7 @@ class YahooDataCollector(DataCollector):
             start_time = (current_time - timedelta(days=i)).strftime("%Y-%m-%d")
             end_time = (current_time - timedelta(days=i - 1)).strftime("%Y-%m-%d")
 
-            historical_data_path = "../datasets/historical_data/"
+            historical_data_path = "./datasets/historical_data/"
             folder_path = historical_data_path + start_time + "/"
             try:
                 Path(folder_path).mkdir(parents=True, exist_ok=True)
@@ -175,7 +184,7 @@ class YahooDataCollector(DataCollector):
         start_time = current_time.strftime("%Y-%m-%d")
         end_time = (current_time + timedelta(days=1)).strftime("%Y-%m-%d")
 
-        historical_data_path = "../datasets/historical_data/"
+        historical_data_path = "./datasets/historical_data/"
         folder_path = historical_data_path + start_time + "/"
 
         for stock in stocks:
