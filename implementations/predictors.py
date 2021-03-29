@@ -15,7 +15,7 @@ class RNNPredictor(Predictor):
         self.dev_mode = dev_mode
 
         self.model = tf.keras.models.Sequential([
-            tf.keras.layers.GRU(64, return_sequences=True),
+            tf.keras.layers.LSTM(64, return_sequences=True),
             tf.keras.layers.LSTM(32, return_sequences=True),
             tf.keras.layers.Dense(units=1)
         ])
@@ -59,6 +59,24 @@ class RNNPredictor(Predictor):
             plt.plot([i for i in range(self.window - 1)],
                      predictions[0, :, 0] * self.std[2] + self.mean[2], 'r-*', label="Predictions")
 
+            actual = [x[0][0] for x in labels.numpy()]
+            actual_change = []
+            predicted = [x[0][0] for x in predictions.numpy()]
+            predicted_change = []
+
+            for i in range(1, len(actual)):
+                actual_change_value = (actual[i] - actual[i - 1])/abs(actual[i] - actual[i - 1])
+                actual_change.append(actual_change_value)
+                predicted_change_value = (predicted[i] - predicted[i - 1])/abs(predicted[i] - predicted[i - 1])
+                predicted_change.append(predicted_change_value)
+
+            matches = [1 for x, y in zip(actual_change, predicted_change) if x == y]
+            print(f'input labels= {actual}')
+            print(f'input labels change= {actual_change}')
+            print(f'predictions= {predicted}')
+            print(f'input labels change= {predicted_change}')
+            print(f'matches={matches}')
+            print(f'trend accuracy = {len(matches)/len(actual_change)}')
             plt.legend()
             plt.show()
 
@@ -133,7 +151,7 @@ class RNNPredictor(Predictor):
 class ImpairedRNNPredictor(RNNPredictor):
 
     def __init__(self, stock: str, data_interval: timedelta, window: int=100, epochs: int=32, dev_mode: bool=False):
-        super().__init__(stock, data_interval, window, epochs)
+        super().__init__(stock, data_interval, window, epochs, dev_mode)
 
     def update_model(self, actual_data_point: DataPoint):
         self.last_batch = np.concatenate((self.last_batch, [self.data_point_to_array(actual_data_point)]))
@@ -145,15 +163,18 @@ def test():
     from implementations.visualizer import MatPlotLibVisualizer
     from time import sleep
 
-    number_of_predictions = 30
+    physical_devices = tf.config.list_physical_devices('GPU')
+    tf.config.experimental.set_memory_growth(physical_devices[0], enable=True)
+
+    number_of_predictions = 400
     stock = 'GME'
     date = datetime(2021, 3, 18, 9, 35)
 
-    visualizer = MatPlotLibVisualizer(1, show_interval=timedelta(minutes=number_of_predictions))
+    # visualizer = MatPlotLibVisualizer(1, show_interval=timedelta(minutes=number_of_predictions))
     data_collector = YahooDataCollector(60)
     historical_data = data_collector.get_historical_data(stock, date, number_of_days=25)
 
-    predictor = ImpairedRNNPredictor(stock, timedelta(minutes=1), 100, 20)
+    predictor = ImpairedRNNPredictor(stock, timedelta(minutes=1), 100, 35, dev_mode=False)
     predictor.train(historical_data)
 
     predictions = []
@@ -166,7 +187,25 @@ def test():
 
         prediction = predictor.predict_next_price(point)
         predictions.append(prediction)
-        visualizer.update_predictions_plot(predictions)
+        # visualizer.update_predictions_plot(predictions)
+
+    actual_change = []
+    predicted_change = []
+    error = []
+
+    for i in range(1, len(predictions) - 1):
+        actual_change_value = (predictions[i + 1].current_price - predictions[i].current_price) / abs(predictions[i + 1].current_price - predictions[i].current_price)
+        actual_change.append(actual_change_value)
+        predicted_change_value = (predictions[i].predicted_price - predictions[i - 1].predicted_price) / abs(predictions[i].predicted_price - predictions[i - 1].predicted_price)
+        predicted_change.append(predicted_change_value)
+        error.append(abs(predictions[i].predicted_price - predictions[i + 1].current_price))
+
+    matches = [1 for x, y in zip(actual_change, predicted_change) if x == y]
+    print(f'input labels change= {actual_change}')
+    print(f'predicted change change= {predicted_change}')
+    print(f'matches={matches}')
+    print(f'trend accuracy = {len(matches) / len(actual_change)}')
+    print(f'error = {sum(error) / len(error) / (sum([x.current_price for x in predictions]) / len(predictions))}')
 
     while True:
         sleep(1)
